@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Semáforo — Status ESP32</title>
+<style>
+  :root{
+    --gris:#737373; --crema:#FFF599;
+    --verde:#00FF22; --amarillo:#FFE600; --rojo:#FF0004;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; min-height:100vh; background:#fff;
+    font-family:Inter,Arial,Helvetica,sans-serif;
+    display:flex; align-items:center; justify-content:center; padding:24px;
+  }
+  .wrap{display:flex; gap:32px; align-items:flex-start; flex-wrap:wrap; justify-content:center}
+  /* Réplica Figma */
+  .header-status{
+    width:400px; height:110px; background:var(--gris);
+    border:5px solid #000; border-radius:35px;
+    display:flex; align-items:center; justify-content:center;
+    color:#fff; font-weight:700; font-size:48px; letter-spacing:2px;
+    margin:0 auto 20px auto;
+  }
+  .semaforo{
+    width:267px; min-height:574px; background:var(--crema);
+    border:5px solid #000; border-radius:35px;
+    display:flex; flex-direction:column; align-items:center;
+    padding:36px 0; gap:28px;
+  }
+  .luz{
+    width:122px; height:122px; border-radius:50%;
+    border:10px solid #000; opacity:.18; transition:all .25s;
+  }
+  .luz.verde{background:var(--verde)}
+  .luz.amarilla{background:var(--amarillo)}
+  .luz.roja{background:var(--rojo)}
+  .luz.on{opacity:1}
+  .luz.on.verde{box-shadow:0 0 40px 8px rgba(0,255,34,.8)}
+  .luz.on.amarilla{box-shadow:0 0 40px 8px rgba(255,230,0,.9)}
+  .luz.on.roja{box-shadow:0 0 40px 8px rgba(255,0,4,.8)}
+  /* Panel */
+  .panel{width:320px; border:5px solid #000; border-radius:35px; padding:24px; background:#fff}
+  .panel h2{margin:0 0 4px 0; font-size:22px}
+  .panel p{margin:6px 0; font-size:17px}
+  .count{font-size:64px; font-weight:800; margin:8px 0; line-height:1}
+  .barra{height:16px; border:3px solid #000; border-radius:99px; overflow:hidden; margin:12px 0}
+  .barra > div{height:100%; width:50%; background:#000; transition:width 1s linear}
+  .dot{display:inline-block; width:14px; height:14px; border-radius:50%; background:#999; margin-right:8px; vertical-align:middle}
+  .dot.ok{background:#00c531; box-shadow:0 0 10px #00c531}
+  .badge{display:inline-block; border:3px solid #000; border-radius:99px; padding:4px 14px; font-weight:700; margin-top:6px}
+  small{color:#555}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div>
+    <div class="header-status">STATUS</div>
+    <div class="semaforo">
+      <div id="luz-verde" class="luz verde"></div>
+      <div id="luz-amarilla" class="luz amarilla"></div>
+      <div id="luz-roja" class="luz roja"></div>
+    </div>
+  </div>
+  <div class="panel">
+    <h2><span id="dot" class="dot"></span><span id="conexion">Conectando…</span></h2>
+    <p>Luz actual: <b id="luz-actual">—</b></p>
+    <p>Puerto activo ESP32: <b id="pin">—</b></p>
+    <div class="count"><span id="quedan">–</span>s</div>
+    <p id="cambio-label">para el cambio de luz</p>
+    <div class="barra"><div id="progreso"></div></div>
+    <span class="badge" id="modo">modo: …</span>
+    <p><small>Fuente: <code>GET /api/estado</code> cada 1 s. Tiempos: verde 15 s, amarilla 5 s, roja 20 s.</small></p>
+  </div>
+</div>
+<script>
+  const el = id => document.getElementById(id);
+  const luces = { verde: el('luz-verde'), amarilla: el('luz-amarilla'), roja: el('luz-roja') };
+  async function actualizar() {
+    try {
+      const r = await fetch('/api/estado');
+      const d = await r.json();
+      for (const k of Object.keys(luces)) luces[k].classList.toggle('on', k === d.luz);
+      el('luz-actual').textContent = d.luz.toUpperCase();
+      el('pin').textContent = 'GPIO ' + d.pin;
+      el('quedan').textContent = d.quedan;
+      el('modo').textContent = 'modo: ' + d.modo;
+      const pct = d.duracion ? Math.max(0, Math.min(100, (d.quedan / d.duracion) * 100)) : 0;
+      el('progreso').style.width = pct + '%';
+      const ok = !!d.conectado;
+      el('dot').classList.toggle('ok', ok);
+      el('conexion').textContent = ok
+        ? (String(d.modo).startsWith('usb:') ? 'ESP32 conectado (' + d.modo + ')' : 'ESP32 simulado')
+        : 'ESP32 desconectado';
+      if (!ok) for (const k of Object.keys(luces)) luces[k].classList.remove('on');
+    } catch (e) {
+      el('conexion').textContent = 'Sin servidor (¿corriste server.py?)';
+    }
+  }
+  actualizar();
+  setInterval(actualizar, 1000);
+</script>
+</body>
+</html>
